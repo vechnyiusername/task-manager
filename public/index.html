@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .auth-section, .tasks-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        input[type="text"], 
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .task-list {
+            list-style: none;
+            margin-top: 20px;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #eee;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+
+        .task-item.completed {
+            background: #f8f9fa;
+            opacity: 0.7;
+        }
+
+        .error-message {
+            color: #dc3545;
+            margin: 10px 0;
+        }
+
+        .success-message {
+            color: #28a745;
+            margin: 10px 0;
+        }
+
+        .auth-toggle {
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .edit-form {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .logout-btn {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            background: #dc3545;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <div class="auth-section" id="authSection">
+            <div id="authForm">
+                <h2>Login</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <input type="text" id="loginUsername" placeholder="Username" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="loginPassword" placeholder="Password" required>
+                    </div>
+                    <button type="submit">Login</button>
+                </form>
+                
+                <div class="auth-toggle">
+                    <button onclick="showRegisterForm()">Switch to Register</button>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="tasks-section" id="tasksSection" style="display: none;">
+            <button class="logout-btn" onclick="logout()">Logout</button>
+            <h2>My Tasks</h2>
+            <form id="taskForm">
+                <input type="text" id="taskTitle" placeholder="New task title" required>
+                <button type="submit">Add Task</button>
+            </form>
+            
+            <ul class="task-list" id="taskList"></ul>
+        </div>
+
+       
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5003/api';
+        let currentUser = null;
+
+        
+        async function login(username, password) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    showTasksSection();
+                    loadTasks();
+                } else {
+                    showMessage(data.msg || 'Login failed', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error', 'error');
+            }
+        }
+
+        async function register(username, password) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                if (response.ok) {
+                    showMessage('Registration successful! Please login', 'success');
+                    showLoginForm();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.msg || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error', 'error');
+            }
+        }
+
+        
+        function logout() {
+            localStorage.removeItem('token');
+            showAuthSection();
+            showMessage('You have been logged out', 'success');
+        }
+
+        
+        async function loadTasks() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${API_BASE}/tasks`, {
+                    headers: { 'x-auth-token': token }
+                });
+                
+                const tasks = await response.json();
+                renderTasks(tasks);
+            } catch (error) {
+                showMessage('Error loading tasks', 'error');
+            }
+        }
+
+        async function createTask(title) {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${API_BASE}/tasks`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-auth-token': token 
+                    },
+                    body: JSON.stringify({ title })
+                });
+                
+                if (response.ok) {
+                    loadTasks();
+                    document.getElementById('taskTitle').value = '';
+                } else {
+                    showMessage('Error creating task', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error', 'error');
+            }
+        }
+
+        async function toggleTask(id, completed) {
+            try {
+                const token = localStorage.getItem('token');
+                await fetch(`${API_BASE}/tasks/${id}`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-auth-token': token 
+                    },
+                    body: JSON.stringify({ completed })
+                });
+                loadTasks();
+            } catch (error) {
+                showMessage('Error updating task', 'error');
+            }
+        }
+
+        async function deleteTask(id) {
+            try {
+                const token = localStorage.getItem('token');
+                await fetch(`${API_BASE}/tasks/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'x-auth-token': token }
+                });
+                loadTasks();
+            } catch (error) {
+                showMessage('Error deleting task', 'error');
+            }
+        }
+
+        async function editTask(id, newTitle) {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${API_BASE}/tasks/${id}`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-auth-token': token 
+                    },
+                    body: JSON.stringify({ title: newTitle })
+                });
+                
+                if (response.ok) {
+                    loadTasks();
+                } else {
+                    showMessage('Error updating task', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error', 'error');
+            }
+        }
+
+        // UI Functions
+        function renderTasks(tasks) {
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = tasks.map(task => `
+                <li class="task-item ${task.completed ? 'completed' : ''}">
+                    <input type="checkbox" 
+                           ${task.completed ? 'checked' : ''} 
+                           onchange="toggleTask('${task._id}', this.checked)"
+                           style="margin-right: 10px;">
+                    <span style="flex-grow: 1">${task.title}</span>
+                    <button onclick="showEditForm('${task._id}')">Edit</button>
+                    <button onclick="deleteTask('${task._id}')">Delete</button>
+                    <div id="editForm-${task._id}" class="edit-form">
+                        <input type="text" id="editTitle-${task._id}" value="${task.title}">
+                        <button onclick="saveEdit('${task._id}')">Save</button>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        function showEditForm(taskId) {
+            const editForm = document.getElementById(`editForm-${taskId}`);
+            editForm.style.display = 'block';
+        }
+
+        async function saveEdit(taskId) {
+            const newTitle = document.getElementById(`editTitle-${taskId}`).value;
+            if (newTitle.trim()) {
+                await editTask(taskId, newTitle.trim());
+            }
+        }
+
+        function showMessage(message, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = `<div class="${type}-message">${message}</div>`;
+            setTimeout(() => messagesDiv.innerHTML = '', 3000);
+        }
+
+        function showTasksSection() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('tasksSection').style.display = 'block';
+        }
+
+        function showAuthSection() {
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('tasksSection').style.display = 'none';
+        }
+
+        function showLoginForm() {
+            document.getElementById('authForm').innerHTML = `
+                <h2>Login</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <input type="text" id="loginUsername" placeholder="Username" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="loginPassword" placeholder="Password" required>
+                    </div>
+                    <button type="submit">Login</button>
+                </form>
+                <div class="auth-toggle">
+                    <button onclick="showRegisterForm()">Switch to Register</button>
+                </div>
+            `;
+        }
+
+        function showRegisterForm() {
+            document.getElementById('authForm').innerHTML = `
+                <h2>Register</h2>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <input type="text" id="registerUsername" placeholder="Username" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="registerPassword" placeholder="Password" required>
+                    </div>
+                    <button type="submit">Register</button>
+                </form>
+                <div class="auth-toggle">
+                    <button onclick="showLoginForm()">Switch to Login</button>
+                </div>
+            `;
+        }
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('token')) {
+                showTasksSection();
+                loadTasks();
+            }
+
+            // Auth forms
+            document.addEventListener('submit', async (e) => {
+                if (e.target.id === 'loginForm') {
+                    e.preventDefault();
+                    const username = document.getElementById('loginUsername').value;
+                    const password = document.getElementById('loginPassword').value;
+                    await login(username, password);
+                }
+
+                if (e.target.id === 'registerForm') {
+                    e.preventDefault();
+                    const username = document.getElementById('registerUsername').value;
+                    const password = document.getElementById('registerPassword').value;
+                    await register(username, password);
+                }
+
+                if (e.target.id === 'taskForm') {
+                    e.preventDefault();
+                    const title = document.getElementById('taskTitle').value;
+                    if (title.trim()) {
+                        await createTask(title.trim());
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
