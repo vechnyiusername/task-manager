@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,11 +24,12 @@
             position: relative;
         }
 
-        .auth-section, .tasks-section {
+        .auth-section,
+        .tasks-section {
             background: white;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
         }
 
@@ -35,7 +37,7 @@
             margin-bottom: 15px;
         }
 
-        input[type="text"], 
+        input[type="text"],
         input[type="password"] {
             width: 100%;
             padding: 10px;
@@ -109,9 +111,10 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
-        
+
         <div class="auth-section" id="authSection">
             <div id="authForm">
                 <h2>Login</h2>
@@ -124,14 +127,14 @@
                     </div>
                     <button type="submit">Login</button>
                 </form>
-                
+
                 <div class="auth-toggle">
                     <button onclick="showRegisterForm()">Switch to Register</button>
                 </div>
             </div>
         </div>
 
-        
+
         <div class="tasks-section" id="tasksSection" style="display: none;">
             <button class="logout-btn" onclick="logout()">Logout</button>
             <h2>My Tasks</h2>
@@ -139,19 +142,19 @@
                 <input type="text" id="taskTitle" placeholder="New task title" required>
                 <button type="submit">Add Task</button>
             </form>
-            
+
             <ul class="task-list" id="taskList"></ul>
         </div>
 
-       
+
         <div id="messages"></div>
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:5003/api';
+        const API_BASE = `http://localhost:${process.env.PORT}/api`;
         let currentUser = null;
 
-        
+
         async function login(username, password) {
             try {
                 const response = await fetch(`${API_BASE}/auth/login`, {
@@ -159,7 +162,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
-                
+
                 const data = await response.json();
                 if (response.ok) {
                     localStorage.setItem('token', data.token);
@@ -180,7 +183,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
-                
+
                 if (response.ok) {
                     showMessage('Registration successful! Please login', 'success');
                     showLoginForm();
@@ -193,21 +196,21 @@
             }
         }
 
-        
+
         function logout() {
             localStorage.removeItem('token');
             showAuthSection();
             showMessage('You have been logged out', 'success');
         }
 
-        
+
         async function loadTasks() {
             try {
                 const token = localStorage.getItem('token');
                 const response = await fetch(`${API_BASE}/tasks`, {
                     headers: { 'x-auth-token': token }
                 });
-                
+
                 const tasks = await response.json();
                 renderTasks(tasks);
             } catch (error) {
@@ -220,13 +223,13 @@
                 const token = localStorage.getItem('token');
                 const response = await fetch(`${API_BASE}/tasks`, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
-                        'x-auth-token': token 
+                        'x-auth-token': token
                     },
                     body: JSON.stringify({ title })
                 });
-                
+
                 if (response.ok) {
                     loadTasks();
                     document.getElementById('taskTitle').value = '';
@@ -243,9 +246,9 @@
                 const token = localStorage.getItem('token');
                 await fetch(`${API_BASE}/tasks/${id}`, {
                     method: 'PUT',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
-                        'x-auth-token': token 
+                        'x-auth-token': token
                     },
                     body: JSON.stringify({ completed })
                 });
@@ -273,13 +276,13 @@
                 const token = localStorage.getItem('token');
                 const response = await fetch(`${API_BASE}/tasks/${id}`, {
                     method: 'PUT',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
-                        'x-auth-token': token 
+                        'x-auth-token': token
                     },
                     body: JSON.stringify({ title: newTitle })
                 });
-                
+
                 if (response.ok) {
                     loadTasks();
                 } else {
@@ -408,4 +411,5 @@
         });
     </script>
 </body>
+
 </html>
